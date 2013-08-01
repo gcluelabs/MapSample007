@@ -7,40 +7,35 @@ import java.util.Locale;
 import android.content.Context;
 import android.location.Address;
 import android.location.Geocoder;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.os.Bundle;
+import android.support.v4.app.FragmentActivity;
+import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.Toast;
 
-import com.google.android.maps.GeoPoint;
-import com.google.android.maps.MapActivity;
-import com.google.android.maps.MapController;
-import com.google.android.maps.MapView;
+import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.maps.CameraUpdate;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.MapsInitializer;
+import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.LatLng;
 
-public class MapSample extends MapActivity implements LocationListener {
+public class MapSample extends FragmentActivity {
 
 	/** 緯度、経度を表示するボタン。 */
 	private Button mButton01;
 	/** 移動ボタン。 */
 	private Button mButton02;
-	/** MapViewを格納する。 */
-	private MapView mMap;
-	/** MapControllerを格納する。 */
-	private MapController mMapController;
+	/** 現在地点に移動するボタン。 */
+	private Button mButton03;
+	/** GoogleMapを格納する。 */
+	private GoogleMap mMap;
 	/** BindするContext。 */
 	private Context mContext;
-	/** GPSで取得した緯度を保持する。 */
-	double mylat;
-	/** GPSで取得した経度を保持する。 */
-	double mylon;
-	/** LocationManagerを格納する。 */
-	LocationManager mLocationManager;
-	/** 現在地点に移動するボタン。 */
-	Button mButton03;
+
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -49,23 +44,18 @@ public class MapSample extends MapActivity implements LocationListener {
 
 		// Contextを格納(Toastで使用)
 		mContext = this.getApplicationContext();
-		// LocationManagerでGPSの値を取得するための設定
-		mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-		// 値が変化した際に呼び出されるリスナーの追加
-		mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
-				60 * 1000, 0, this);
+
 		// res/layout/activity_map_sample.xmlのmapViewのを呼び出す
-		mMap = (MapView) findViewById(R.id.mapView);
-
-		// Mapの操作で使用
-		mMapController = mMap.getController();
-
-		// Mapの縮尺を設定
-		mMapController.setZoom(15);
-
-		// ズームコントローラーの表示
-		mMap.setBuiltInZoomControls(true);
-
+		mMap = ((SupportMapFragment) getSupportFragmentManager()
+				.findFragmentById(R.id.mapView)).getMap();
+		try {
+			// Mapの初期化
+			MapsInitializer.initialize(this);
+		} catch (GooglePlayServicesNotAvailableException e) {
+			Log.d("GoogleMap", "You must update Google Maps.");
+			finish();
+		}
+		mMap.setMyLocationEnabled(true);
 		// 緯度・経度を表示するボタン。押すと緯度経度のToastを表示する
 		mButton01 = (Button) findViewById(R.id.Button01);
 
@@ -74,10 +64,10 @@ public class MapSample extends MapActivity implements LocationListener {
 			// Button01が押された時の処理
 			@Override
 			public void onClick(View v) {
+				LatLng latLng = mMap.getCameraPosition().target;
 				// 地図の中心点の緯度・経度を取得
-				double lat = mMap.getMapCenter().getLatitudeE6() / 1E6;
-				double lon = mMap.getMapCenter().getLongitudeE6() / 1E6;
-
+				double lat = latLng.latitude;
+				double lon = latLng.longitude;
 				// Geocoderで住所を取得
 				Geocoder mGeocoder = new Geocoder(mContext, Locale.getDefault());
 
@@ -106,17 +96,16 @@ public class MapSample extends MapActivity implements LocationListener {
 						Toast.LENGTH_LONG).show();
 			}
 		});
-
-		// 移動ボタン。押すと設定の緯度経度に移動
 		mButton02 = (Button) findViewById(R.id.Button02);
 
 		// Button02のイベント処理
 		mButton02.setOnClickListener(new OnClickListener() {
-			// Button02が押された時の処理
+			// Button01が押された時の処理
 			@Override
 			public void onClick(View v) {
-				GeoPoint point = new GeoPoint(35709999, 139810767); // スカイツリー
-				mMapController.animateTo(point);
+				CameraUpdate cu = CameraUpdateFactory.newLatLngZoom(new LatLng(
+						35.712496928929276, 139.80357825960232), 15); // スカイツリー
+				mMap.moveCamera(cu);
 			}
 		});
 		// 押すと現在緯度経度に移動
@@ -125,39 +114,14 @@ public class MapSample extends MapActivity implements LocationListener {
 		mButton03.setOnClickListener(new OnClickListener() {
 			// Button03が押された時の処理
 			public void onClick(View v) {
-				GeoPoint point = new GeoPoint((int) (mylat * 1E6),
-						(int) (mylon * 1E6));
-				mMapController.animateTo(point);
+				double mylat = mMap.getMyLocation().getLatitude();
+				double mylon = mMap.getMyLocation().getLongitude();
+				CameraUpdate cu = CameraUpdateFactory.newLatLngZoom(new LatLng(
+						mylat, mylon), 15); 
+				mMap.moveCamera(cu);
 			}
 		});
 	}
 
-	@Override
-	protected boolean isRouteDisplayed() {
-		return false;
-	}
 
-	@Override
-	public void onLocationChanged(Location location) {
-		mylat = location.getLatitude();
-		mylon = location.getLongitude();
-	}
-
-	@Override
-	public void onProviderDisabled(String provider) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void onProviderEnabled(String provider) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void onStatusChanged(String provider, int status, Bundle extras) {
-		// TODO Auto-generated method stub
-
-	}
 }
